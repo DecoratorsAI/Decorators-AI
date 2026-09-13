@@ -9,58 +9,90 @@ import {
   Building,
   User,
   Calendar,
+  Phone,
+  Mail,
+  MapPin,
+  Globe,
+  Share2,
 } from "lucide-react";
-import { JobAnalysisResult } from "../types";
+import { JobAnalysisResult, BusinessSettings, Customer } from "../types";
+import { formatWholeDaysDuration } from "../utils/teamLabour";
 
 interface ClientQuoteViewProps {
   quote: JobAnalysisResult["clientQuote"];
   jobTitle: string;
   originalDescription: string;
+  includeVat: boolean;
+  onToggleVat: () => void;
+  settings?: BusinessSettings;
+  customer?: Customer;
+  onOpenCustomerPortal?: () => void;
 }
 
 export const ClientQuoteView: React.FC<ClientQuoteViewProps> = ({
   quote,
   jobTitle,
   originalDescription,
+  includeVat,
+  onToggleVat,
+  settings,
+  customer,
+  onOpenCustomerPortal,
 }) => {
   const [copied, setCopied] = useState(false);
-  const [includeVat, setIncludeVat] = useState(false);
-  const [businessName, setBusinessName] = useState("Professional Decorating Services");
-  const [clientName, setClientName] = useState("Homeowner / Client");
+  const [businessName, setBusinessName] = useState(
+    settings?.businessName || "Professional Decorating Services"
+  );
+  const [clientName, setClientName] = useState(
+    customer?.fullName || quote.customerName || "Homeowner / Client"
+  );
 
-  const vatAmount = includeVat ? Math.round(quote.subtotal * 0.2) : 0;
+  const isVatEffective = settings ? settings.vatRegistered : includeVat;
+  const vatAmount = isVatEffective ? Math.round(quote.subtotal * 0.2) : 0;
   const finalTotal = quote.subtotal + vatAmount;
+  const displayDuration = formatWholeDaysDuration(quote.estimatedDuration);
 
   const generateFormattedQuoteText = () => {
     let text = `==============================\n`;
     text += `ESTIMATE & QUOTATION\n`;
     text += `==============================\n`;
-    text += `From: ${businessName}\n`;
+    text += `From: ${businessName || settings?.businessName}\n`;
+    if (settings?.phone) text += `Phone: ${settings.phone}\n`;
+    if (settings?.email) text += `Email: ${settings.email}\n`;
+    if (settings?.vatRegistered && settings?.vatNumber) {
+      text += `VAT Reg No: ${settings.vatNumber}\n`;
+    }
     text += `To: ${clientName}\n`;
+    if (customer?.address) text += `Site Address: ${customer.address}\n`;
     text += `Date: ${quote.date}\n`;
     text += `Quote Ref: ${quote.quoteReference}\n\n`;
     text += `PROJECT: ${jobTitle}\n`;
     text += `Scope of Works:\n${quote.scopeSummary}\n\n`;
     text += `SCHEDULE OF WORKS & LINE ITEMS:\n`;
     quote.lineItems?.forEach((item, index) => {
-      const isZeroCost = item.amountPounds === 0 || item.category.toLowerCase().includes("customer");
+      const isZeroCost =
+        item.amountPounds === 0 || item.category.toLowerCase().includes("customer");
       text += `${index + 1}. ${item.description}\n   Category: ${item.category} - ${
         isZeroCost ? "£0 (Customer Supplied)" : `£${item.amountPounds}`
       }\n`;
     });
     text += `\n------------------------------\n`;
     text += `Subtotal: £${quote.subtotal}\n`;
-    if (includeVat) {
+    if (isVatEffective) {
       text += `VAT (20%): £${vatAmount}\n`;
       text += `TOTAL (Inc. VAT): £${finalTotal}\n`;
     } else {
       text += `TOTAL (No VAT / Sole Trader): £${finalTotal}\n`;
     }
     text += `------------------------------\n\n`;
-    text += `Estimated Duration: ${quote.estimatedDuration}\n`;
-    text += `Payment Terms: ${quote.paymentTerms}\n\n`;
+    text += `Estimated Duration: ${displayDuration}\n`;
+    text += `Payment Terms: ${settings?.paymentTerms || quote.paymentTerms}\n\n`;
     text += `Notes & Conditions:\n`;
-    quote.notesAndExclusions?.forEach((n) => {
+    const exclusions =
+      settings?.standardExclusions && settings.standardExclusions.length > 0
+        ? settings.standardExclusions
+        : quote.notesAndExclusions || [];
+    exclusions.forEach((n) => {
       text += `• ${n}\n`;
     });
     text += `\nPrepared with Decorator AI UK`;
@@ -83,7 +115,7 @@ export const ClientQuoteView: React.FC<ClientQuoteViewProps> = ({
       {/* Header bar with controls */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-5 mb-5 border-b border-slate-100 print:hidden">
         <div className="flex items-center space-x-2.5">
-          <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-sm">
+          <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-800 flex items-center justify-center font-bold text-sm">
             7
           </div>
           <div>
@@ -103,11 +135,24 @@ export const ClientQuoteView: React.FC<ClientQuoteViewProps> = ({
             <span>Print / PDF</span>
           </button>
 
+          {/* Customer Portal Link Button */}
+          {onOpenCustomerPortal && (
+            <button
+              type="button"
+              onClick={onOpenCustomerPortal}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-xs"
+              title="Preview Customer Portal and Copy Public Link"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Customer Portal</span>
+            </button>
+          )}
+
           {/* Copy Quote Button */}
           <button
             id="copy-quote-btn"
             onClick={handleCopyQuote}
-            className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition shadow-sm"
+            className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 text-slate-950 text-xs font-bold transition shadow-sm"
             title="Copy formatted quote for WhatsApp or Email"
           >
             {copied ? (
@@ -125,49 +170,65 @@ export const ClientQuoteView: React.FC<ClientQuoteViewProps> = ({
         </div>
       </div>
 
-      {/* Editable Business & Client details for on-the-spot personalisation */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200/80 print:bg-transparent print:border-none print:p-0">
-        <div>
-          <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
-            Your Business Name (Optional)
-          </label>
-          <input
-            type="text"
-            value={businessName}
-            onChange={(e) => setBusinessName(e.target.value)}
-            className="w-full text-xs sm:text-sm font-semibold text-slate-800 bg-white print:bg-transparent px-2.5 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-amber-500"
-            placeholder="e.g. Apex Decorating Ltd"
-          />
-        </div>
-
-        <div>
-          <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
-            Client Name / Property
-          </label>
-          <input
-            type="text"
-            value={clientName}
-            onChange={(e) => setClientName(e.target.value)}
-            className="w-full text-xs sm:text-sm font-semibold text-slate-800 bg-white print:bg-transparent px-2.5 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-amber-500"
-            placeholder="e.g. Mr & Mrs Smith, 14 Park Road"
-          />
-        </div>
-      </div>
-
       {/* Quote Document Representation */}
-      <div className="border border-slate-200 rounded-xl p-5 bg-white space-y-5">
-        {/* Quote Meta Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 gap-2">
-          <div>
-            <span className="text-xs uppercase font-extrabold tracking-wider text-amber-600">
-              Formal Quotation
-            </span>
-            <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
-              {jobTitle}
-            </h3>
+      <div className="border border-slate-200 rounded-xl p-6 bg-white space-y-6">
+        {/* Trade Letterhead Header */}
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-5 border-b border-slate-200">
+          <div className="flex items-start space-x-3.5">
+            {settings?.logoDataUrl ? (
+              <div className="w-16 h-16 rounded-xl border border-slate-200 p-1 flex items-center justify-center bg-slate-50 shrink-0">
+                <img
+                  src={settings.logoDataUrl}
+                  alt={businessName}
+                  className="max-h-full max-w-full object-contain"
+                />
+              </div>
+            ) : (
+              <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-200 flex items-center justify-center text-orange-600 shrink-0">
+                <Building className="w-6 h-6" />
+              </div>
+            )}
+            <div>
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
+                {businessName}
+              </h3>
+              {settings?.ownerName && (
+                <p className="text-xs text-slate-600 font-medium">
+                  {settings.ownerName}
+                </p>
+              )}
+              {settings?.address && (
+                <p className="text-[11px] text-slate-500 max-w-xs mt-0.5">
+                  {settings.address}
+                </p>
+              )}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600 mt-1">
+                {settings?.phone && (
+                  <span className="flex items-center space-x-1">
+                    <Phone className="w-3 h-3 text-orange-600" />
+                    <span>{settings.phone}</span>
+                  </span>
+                )}
+                {settings?.email && (
+                  <span className="flex items-center space-x-1">
+                    <Mail className="w-3 h-3 text-orange-600" />
+                    <span>{settings.email}</span>
+                  </span>
+                )}
+                {settings?.website && (
+                  <span className="flex items-center space-x-1">
+                    <Globe className="w-3 h-3 text-orange-600" />
+                    <span>{settings.website}</span>
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="text-left sm:text-right text-xs text-slate-500 space-y-0.5">
+          <div className="text-left sm:text-right text-xs text-slate-500 space-y-1 shrink-0">
+            <span className="text-xs uppercase font-extrabold tracking-wider text-orange-600 block">
+              Formal Quotation
+            </span>
             <div>
               <strong className="text-slate-700">Ref: </strong>
               <span className="font-mono font-semibold text-slate-900">{quote.quoteReference}</span>
@@ -176,15 +237,49 @@ export const ClientQuoteView: React.FC<ClientQuoteViewProps> = ({
               <strong className="text-slate-700">Date: </strong>
               <span>{quote.date}</span>
             </div>
+            {settings?.vatRegistered && settings.vatNumber && (
+              <div>
+                <strong className="text-slate-700">VAT Reg No: </strong>
+                <span className="font-mono font-medium text-slate-900">{settings.vatNumber}</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Scope Summary */}
+        {/* Client & Property Section */}
+        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+              Quotation For:
+            </span>
+            <p className="text-sm font-bold text-slate-900">{clientName}</p>
+            {customer?.companyName && (
+              <p className="text-xs text-orange-600 font-medium">{customer.companyName}</p>
+            )}
+            {customer?.phone && (
+              <p className="text-slate-600 mt-0.5">Tel: {customer.phone}</p>
+            )}
+            {customer?.email && (
+              <p className="text-slate-600">Email: {customer.email}</p>
+            )}
+          </div>
+
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+              Property / Site Address:
+            </span>
+            <p className="text-xs text-slate-700 font-medium leading-relaxed">
+              {customer?.address || "As specified on site"}
+            </p>
+          </div>
+        </div>
+
+        {/* Project Header */}
         <div>
           <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-1">
-            Scope of Works:
+            Project: {jobTitle}
           </span>
-          <p className="text-xs sm:text-sm text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">
+          <p className="text-xs sm:text-sm text-slate-700 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-200">
             {quote.scopeSummary}
           </p>
         </div>
@@ -194,13 +289,14 @@ export const ClientQuoteView: React.FC<ClientQuoteViewProps> = ({
           <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-2">
             Schedule of Works & Pricing:
           </span>
-          <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+          <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
             {quote.lineItems?.map((item, idx) => {
-              const isZeroCost = item.amountPounds === 0 || item.category.toLowerCase().includes("customer");
+              const isZeroCost =
+                item.amountPounds === 0 || item.category.toLowerCase().includes("customer");
               return (
                 <div
                   key={idx}
-                  className={`flex items-center justify-between p-3 text-xs sm:text-sm ${
+                  className={`flex items-center justify-between p-3.5 text-xs sm:text-sm ${
                     isZeroCost ? "bg-sky-50/40" : "bg-white hover:bg-slate-50/50"
                   }`}
                 >
@@ -232,7 +328,7 @@ export const ClientQuoteView: React.FC<ClientQuoteViewProps> = ({
             <span className="font-semibold text-slate-900">£{quote.subtotal}</span>
           </div>
 
-          {includeVat && (
+          {isVatEffective && (
             <div className="flex items-center justify-between w-full sm:w-64 text-slate-600">
               <span>VAT (20%):</span>
               <span className="font-semibold text-slate-900">£{vatAmount}</span>
@@ -241,15 +337,16 @@ export const ClientQuoteView: React.FC<ClientQuoteViewProps> = ({
 
           <div className="flex items-center justify-between w-full sm:w-64 pt-2 border-t border-slate-200 text-sm sm:text-base font-extrabold text-slate-900">
             <span>Total Quote:</span>
-            <span className="text-amber-600">£{finalTotal}</span>
+            <span className="text-orange-600">£{finalTotal}</span>
           </div>
 
           <div className="print:hidden pt-1">
             <button
-              onClick={() => setIncludeVat(!includeVat)}
+              type="button"
+              onClick={onToggleVat}
               className="text-[11px] text-slate-500 hover:text-slate-800 underline"
             >
-              {includeVat ? "Switch to No VAT (Sole Trader)" : "Add 20% UK VAT"}
+              {isVatEffective ? "VAT 20% Applied (Switch to Zero/Sole Trader)" : "No VAT (Click to add 20% VAT)"}
             </button>
           </div>
         </div>
@@ -258,24 +355,28 @@ export const ClientQuoteView: React.FC<ClientQuoteViewProps> = ({
         <div className="pt-4 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
           <div>
             <strong className="text-slate-800 block mb-0.5">Estimated Duration:</strong>
-            <p className="text-slate-600">{quote.estimatedDuration}</p>
+            <p className="text-slate-600">{displayDuration}</p>
           </div>
           <div>
             <strong className="text-slate-800 block mb-0.5">Payment Terms:</strong>
-            <p className="text-slate-600">{quote.paymentTerms}</p>
+            <p className="text-slate-600">{settings?.paymentTerms || quote.paymentTerms}</p>
           </div>
         </div>
 
         {/* Notes & Exclusions */}
-        {quote.notesAndExclusions && quote.notesAndExclusions.length > 0 && (
+        {((settings?.standardExclusions && settings.standardExclusions.length > 0) ||
+          (quote.notesAndExclusions && quote.notesAndExclusions.length > 0)) && (
           <div className="pt-4 border-t border-slate-200">
             <strong className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-1.5">
               Terms & Exclusions:
             </strong>
             <ul className="space-y-1 text-xs text-slate-600">
-              {quote.notesAndExclusions.map((note, i) => (
+              {(settings?.standardExclusions && settings.standardExclusions.length > 0
+                ? settings.standardExclusions
+                : quote.notesAndExclusions || []
+              ).map((note, i) => (
                 <li key={i} className="flex items-start space-x-1.5">
-                  <span className="text-amber-500 font-bold">•</span>
+                  <span className="text-orange-500 font-bold">•</span>
                   <span>{note}</span>
                 </li>
               ))}

@@ -1,16 +1,20 @@
 import React from "react";
-import { Info, Home, Maximize2, AlertTriangle, CheckCircle } from "lucide-react";
+import { Info, Home, Maximize2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { JobAnalysisResult } from "../types";
 
 interface JobOverviewCardProps {
   overview: JobAnalysisResult["overview"];
   photosCount: number;
+  workIncluded?: string[];
 }
 
 export const JobOverviewCard: React.FC<JobOverviewCardProps> = ({
   overview,
   photosCount,
+  workIncluded,
 }) => {
+  const itemsIncluded = workIncluded || overview.workIncluded || [];
+
   return (
     <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-sm">
       <div className="flex items-center space-x-2.5 pb-4 mb-4 border-b border-slate-100">
@@ -27,6 +31,29 @@ export const JobOverviewCard: React.FC<JobOverviewCardProps> = ({
       <p className="text-slate-700 text-sm sm:text-base leading-relaxed mb-4">
         {overview.summary}
       </p>
+
+      {/* WORK INCLUDED SECTION */}
+      {itemsIncluded.length > 0 && (
+        <div className="bg-emerald-50/80 border border-emerald-200/90 rounded-xl p-4 mb-4">
+          <div className="flex items-center space-x-2 mb-2.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-950">
+              Work Included
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {itemsIncluded.map((item, i) => (
+              <div
+                key={i}
+                className="flex items-center space-x-2 text-xs sm:text-sm font-semibold text-emerald-950 bg-white/70 border border-emerald-100 rounded-lg px-2.5 py-1.5 shadow-2xs"
+              >
+                <span className="text-emerald-600 font-bold text-base leading-none">✓</span>
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Metric badges */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">

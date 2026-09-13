@@ -1,0 +1,64 @@
+{
+  "entities": {
+    "UserProfile": {
+      "collection": "users",
+      "fields": {
+        "email": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "lastLoginAt": { "type": "string" }
+      }
+    },
+    "BusinessSettings": {
+      "collection": "users/{userId}/settings",
+      "fields": {
+        "businessName": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "defaultRegion": { "type": "string" },
+        "defaultDayRate": { "type": "number" },
+        "vatRegistered": { "type": "boolean" },
+        "savedTeamMembers": { "type": "array" }
+      }
+    },
+    "Customer": {
+      "collection": "users/{userId}/customers",
+      "fields": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "Job": {
+      "collection": "users/{userId}/jobs",
+      "fields": {
+        "id": { "type": "string" },
+        "jobTitle": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "clientQuote": { "type": "map" },
+        "materialsList": { "type": "map" },
+        "labourTime": { "type": "map" },
+        "pricing": { "type": "map" }
+      }
+    },
+    "Expense": {
+      "collection": "users/{userId}/expenses",
+      "fields": {
+        "id": { "type": "string" },
+        "supplier": { "type": "string" },
+        "date": { "type": "string" },
+        "amount": { "type": "number" },
+        "vatAmount": { "type": "number" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "jobId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    }
+  }
+}

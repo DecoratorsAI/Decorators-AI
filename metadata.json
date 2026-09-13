@@ -1,6 +1,6 @@
 {
   "name": "Decorator AI",
-  "description": "Professional UK AI assistant for painters & decorators. Analyse job descriptions and photos for preparation, paint quantities, labour time, UK pricing, and client quotes.",
+  "description": "Professional UK AI assistant and job management pipeline for painters & decorators. Analyse jobs, calculate whole-day labour and paint quantities, manage pipeline stages, quotes, and customer accounts.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

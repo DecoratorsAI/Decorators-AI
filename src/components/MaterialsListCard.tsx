@@ -8,6 +8,8 @@ import {
   UserCheck,
   CheckCircle2,
   Info,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { JobAnalysisResult, MaterialItem, MaterialSupplyStatus } from "../types";
 
@@ -15,14 +17,21 @@ interface MaterialsListCardProps {
   materialsList: JobAnalysisResult["materialsList"];
   customerSuppliesPaint?: boolean;
   onUpdateMaterials?: (updatedItems: MaterialItem[]) => void;
+  onOpenAddMaterialModal?: () => void;
 }
 
 export const MaterialsListCard: React.FC<MaterialsListCardProps> = ({
   materialsList,
   customerSuppliesPaint,
   onUpdateMaterials,
+  onOpenAddMaterialModal,
 }) => {
   const [filterGroup, setFilterGroup] = useState<"all" | "customer" | "decorator" | "consumables">("all");
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [quickName, setQuickName] = useState("");
+  const [quickBrand, setQuickBrand] = useState("Dulux Trade");
+  const [quickCost, setQuickCost] = useState("");
+  const [quickQty, setQuickQty] = useState("1");
 
   const items = materialsList.items || [];
 
@@ -55,6 +64,37 @@ export const MaterialsListCard: React.FC<MaterialsListCardProps> = ({
     }
   };
 
+  const handleDeleteItem = (index: number) => {
+    if (!onUpdateMaterials) return;
+    const updated = items.filter((_, idx) => idx !== index);
+    onUpdateMaterials(updated);
+  };
+
+  const handleQuickAddSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickName.trim() || !onUpdateMaterials) return;
+
+    const cost = parseFloat(quickCost) || 0;
+    const newItem: MaterialItem = {
+      id: `mat-quick-${Date.now()}`,
+      name: quickName.trim(),
+      brandRecommendation: quickBrand.trim() || "Trade Spec",
+      category: "consumable",
+      quantity: quickQty.trim() || "1",
+      estimatedCostPounds: cost,
+      unitPricePounds: cost,
+      supplyStatus: "need_to_buy",
+      supplyGroup: "decorator_supplied",
+      isCustomerSupplied: false,
+    };
+
+    onUpdateMaterials([...items, newItem]);
+    setQuickName("");
+    setQuickCost("");
+    setQuickQty("1");
+    setShowQuickAdd(false);
+  };
+
   const getCategoryBadgeClass = (category: string) => {
     switch (category) {
       case "paint":
@@ -63,10 +103,20 @@ export const MaterialsListCard: React.FC<MaterialsListCardProps> = ({
         return "bg-amber-100 text-amber-800 border-amber-200";
       case "filler":
         return "bg-purple-100 text-purple-800 border-purple-200";
+      case "wallpaper":
+        return "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200";
+      case "sealant":
+        return "bg-teal-100 text-teal-800 border-teal-200";
+      case "abrasive":
+        return "bg-orange-100 text-orange-800 border-orange-200";
+      case "cleaning":
+        return "bg-cyan-100 text-cyan-800 border-cyan-200";
       case "consumable":
         return "bg-emerald-100 text-emerald-800 border-emerald-200";
       case "protection":
         return "bg-slate-200 text-slate-800 border-slate-300";
+      case "tool":
+        return "bg-indigo-100 text-indigo-800 border-indigo-200";
       default:
         return "bg-slate-100 text-slate-700 border-slate-200";
     }
@@ -127,20 +177,42 @@ export const MaterialsListCard: React.FC<MaterialsListCardProps> = ({
           </div>
         </div>
 
-        <div className="text-left sm:text-right flex sm:flex-col items-baseline sm:items-end justify-between gap-2">
-          <div>
-            <span className="text-[10px] uppercase font-semibold text-slate-400 block">
-              Quote Chargeable
-            </span>
-            <span className="text-lg font-extrabold text-amber-600">
-              £{chargeableMaterialsCost}
-            </span>
+        <div className="flex items-center gap-3">
+          {onOpenAddMaterialModal ? (
+            <button
+              type="button"
+              onClick={onOpenAddMaterialModal}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs transition shadow-xs cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Add Material</span>
+            </button>
+          ) : onUpdateMaterials ? (
+            <button
+              type="button"
+              onClick={() => setShowQuickAdd(!showQuickAdd)}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs transition shadow-xs cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Add Material</span>
+            </button>
+          ) : null}
+
+          <div className="text-left sm:text-right flex sm:flex-col items-baseline sm:items-end justify-between gap-2">
+            <div>
+              <span className="text-[10px] uppercase font-semibold text-slate-400 block">
+                Quote Chargeable
+              </span>
+              <span className="text-lg font-extrabold text-amber-600">
+                £{chargeableMaterialsCost}
+              </span>
+            </div>
+            {customerSuppliedItems.length > 0 && (
+              <span className="text-[11px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md">
+                Paint Customer Supplied (£0)
+              </span>
+            )}
           </div>
-          {customerSuppliedItems.length > 0 && (
-            <span className="text-[11px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md">
-              Paint Customer Supplied (£0)
-            </span>
-          )}
         </div>
       </div>
 
@@ -287,10 +359,22 @@ export const MaterialsListCard: React.FC<MaterialsListCardProps> = ({
                         </span>
                       )}
                     </div>
-                    <span className="text-slate-500 text-[11px] block">
-                      Quantity: {item.quantity}
-                    </span>
-                    {item.notes && (
+                    <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-slate-500">
+                      <span>Quantity: <strong className="text-slate-700">{item.quantity}</strong></span>
+                      {item.packSize && (
+                        <span className="text-slate-400">• Pack: {item.packSize}</span>
+                      )}
+                      {item.supplier && (
+                        <span className="text-slate-400">• Merchant: {item.supplier}</span>
+                      )}
+                    </div>
+                    {item.whyThisMaterial && (
+                      <div className="mt-1 flex items-start gap-1 text-[11px] text-amber-950 bg-amber-50/70 border border-amber-200/70 rounded px-2 py-0.5 max-w-xl">
+                        <strong className="text-amber-800 font-semibold shrink-0">Why:</strong>
+                        <span>{item.whyThisMaterial}</span>
+                      </div>
+                    )}
+                    {item.notes && !item.whyThisMaterial && (
                       <span
                         className={`text-[10px] italic block ${
                           isCustSupplied ? "text-sky-700 font-semibold" : "text-slate-400"
@@ -353,29 +437,102 @@ export const MaterialsListCard: React.FC<MaterialsListCardProps> = ({
                     </div>
                   </td>
 
-                  {/* Charged Price */}
+                  {/* Charged Price & Delete */}
                   <td className="py-3 px-3 text-right font-bold whitespace-nowrap">
-                    {isCustSupplied || isAlreadyHave ? (
+                    <div className="flex items-center justify-end space-x-2">
                       <div>
-                        <span className="text-slate-400 line-through text-[11px] mr-1.5">
-                          £{item.estimatedCostPounds}
-                        </span>
-                        <span className="text-emerald-700 font-extrabold">£0</span>
-                        <span className="block text-[9px] text-slate-400 font-medium">
-                          {isCustSupplied ? "Client supplies" : "From van stock"}
-                        </span>
+                        {isCustSupplied || isAlreadyHave ? (
+                          <div>
+                            <span className="text-slate-400 line-through text-[11px] mr-1.5">
+                              £{item.estimatedCostPounds}
+                            </span>
+                            <span className="text-emerald-700 font-extrabold">£0</span>
+                            <span className="block text-[9px] text-slate-400 font-medium">
+                              {isCustSupplied ? "Client supplies" : "From van stock"}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-900 font-extrabold text-sm">
+                            £{item.estimatedCostPounds}
+                          </span>
+                        )}
                       </div>
-                    ) : (
-                      <span className="text-slate-900 font-extrabold text-sm">
-                        £{item.estimatedCostPounds}
-                      </span>
-                    )}
+
+                      {onUpdateMaterials && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteItem(targetIdx)}
+                          title="Remove material from job"
+                          className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+
+        {/* Inline Quick Add Form if triggered */}
+        {showQuickAdd && onUpdateMaterials && (
+          <form
+            onSubmit={handleQuickAddSubmit}
+            className="p-3 bg-amber-50/70 border-t border-amber-200 flex flex-wrap items-center gap-2 text-xs"
+          >
+            <div className="font-bold text-amber-900 flex items-center gap-1">
+              <Plus className="w-3.5 h-3.5" /> Quick Add:
+            </div>
+            <input
+              type="text"
+              placeholder="Material name (e.g. Caulk, 2x rollers)..."
+              value={quickName}
+              onChange={(e) => setQuickName(e.target.value)}
+              className="flex-1 min-w-[160px] px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-900 focus:outline-none focus:border-orange-500"
+              required
+            />
+            <input
+              type="text"
+              placeholder="Brand"
+              value={quickBrand}
+              onChange={(e) => setQuickBrand(e.target.value)}
+              className="w-24 px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-900 focus:outline-none focus:border-orange-500"
+            />
+            <input
+              type="text"
+              placeholder="Qty"
+              value={quickQty}
+              onChange={(e) => setQuickQty(e.target.value)}
+              className="w-16 px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-900 focus:outline-none focus:border-orange-500"
+            />
+            <div className="relative w-20">
+              <span className="absolute left-2 top-1.5 text-slate-400 font-bold">£</span>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="Cost"
+                value={quickCost}
+                onChange={(e) => setQuickCost(e.target.value)}
+                className="w-full pl-5 pr-2 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-900 focus:outline-none focus:border-orange-500 font-bold"
+              />
+            </div>
+            <button
+              type="submit"
+              className="px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold transition shadow-xs"
+            >
+              Add
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowQuickAdd(false)}
+              className="px-2.5 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold transition"
+            >
+              Cancel
+            </button>
+          </form>
+        )}
       </div>
 
       {/* Footer Summary */}

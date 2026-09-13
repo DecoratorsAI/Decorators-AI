@@ -1,25 +1,52 @@
 import React, { useState } from "react";
-import { PoundSterling, TrendingUp, Sliders, CheckCircle2, AlertCircle } from "lucide-react";
-import { JobAnalysisResult } from "../types";
+import { PoundSterling, TrendingUp, Sliders, CheckCircle2, AlertCircle, Users, ChevronDown, ChevronUp } from "lucide-react";
+import { JobAnalysisResult, TeamMember } from "../types";
+import { TeamSetupSection } from "./TeamSetupSection";
 
 interface PriceRangeCardProps {
   pricing: JobAnalysisResult["pricing"];
   totalDays: number;
+  team?: TeamMember[];
+  onTeamChange?: (updatedTeam: TeamMember[]) => void;
+  sameRateForEveryone?: boolean;
+  onSameRateToggle?: (same: boolean) => void;
+  adjustedDayRate: number;
+  onDayRateChange: (rate: number) => void;
+  includeVat: boolean;
+  onToggleVat: () => void;
 }
 
-export const PriceRangeCard: React.FC<PriceRangeCardProps> = ({ pricing, totalDays }) => {
-  const [includeVat, setIncludeVat] = useState(false);
-  const [adjustedDayRate, setAdjustedDayRate] = useState(pricing.dailyRateUsed || 240);
+export const PriceRangeCard: React.FC<PriceRangeCardProps> = ({
+  pricing,
+  totalDays,
+  team = [{ id: "dec-1", name: "Decorator 1", dayRate: 240 }],
+  onTeamChange,
+  sameRateForEveryone = false,
+  onSameRateToggle = () => {},
+  adjustedDayRate,
+  onDayRateChange,
+  includeVat,
+  onToggleVat,
+}) => {
+  const [showTeamDetails, setShowTeamDetails] = useState(false);
 
-  // Labour calculations based directly on the selected/custom day rate and estimated working days
-  const baseDays = totalDays > 0 ? totalDays : 2.0;
-  const adjLabourMid = Math.round(baseDays * adjustedDayRate);
-  const adjLabourLow = Math.round(adjLabourMid * 0.9);
-  const adjLabourHigh = Math.round(adjLabourMid * 1.15);
+  // Guarantee whole working days only
+  const wholeDays = Math.max(1, Math.round(totalDays || 1));
+  const teamSize = team.length;
+  const combinedTeamRate = team.reduce((sum, d) => sum + (Number(d.dayRate) || 0), 0);
 
-  const totalLowBeforeVat = adjLabourLow + pricing.materialsCost.low;
-  const totalMidBeforeVat = adjLabourMid + pricing.materialsCost.mid;
-  const totalHighBeforeVat = adjLabourHigh + pricing.materialsCost.high;
+  // Accurate labour calculation from whole site days and actual team rates
+  const adjLabourMid = pricing.labourCost?.mid || wholeDays * combinedTeamRate;
+  const adjLabourLow = pricing.labourCost?.low || Math.round(adjLabourMid * 0.9);
+  const adjLabourHigh = pricing.labourCost?.high || Math.round(adjLabourMid * 1.15);
+
+  const materialsLow = pricing.materialsCost?.low || 0;
+  const materialsMid = pricing.materialsCost?.mid || 0;
+  const materialsHigh = pricing.materialsCost?.high || 0;
+
+  const totalLowBeforeVat = adjLabourLow + materialsLow;
+  const totalMidBeforeVat = adjLabourMid + materialsMid;
+  const totalHighBeforeVat = adjLabourHigh + materialsHigh;
 
   const vatMultiplier = includeVat ? 1.2 : 1.0;
   const finalTotalLow = Math.round(totalLowBeforeVat * vatMultiplier);
@@ -58,9 +85,13 @@ export const PriceRangeCard: React.FC<PriceRangeCardProps> = ({ pricing, totalDa
           </span>
         </div>
 
-        <div className="mt-4 pt-3 border-t border-slate-800 grid grid-cols-2 gap-3 text-xs">
+        <div className="mt-4 pt-3 border-t border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
           <div>
-            <span className="text-slate-400 block">Labour Subtotal ({baseDays} days @ £{adjustedDayRate})</span>
+            <span className="text-slate-400 block">
+              {teamSize === 1
+                ? `Labour Subtotal (${wholeDays} working ${wholeDays === 1 ? "day" : "days"} @ £${team[0]?.dayRate || adjustedDayRate}/day)`
+                : `Labour Subtotal (${wholeDays} working ${wholeDays === 1 ? "day" : "days"} • ${teamSize} decorators @ £${combinedTeamRate}/day)`}
+            </span>
             <span className="font-bold text-slate-200">
               £{adjLabourLow} – £{adjLabourHigh}
             </span>
@@ -68,21 +99,23 @@ export const PriceRangeCard: React.FC<PriceRangeCardProps> = ({ pricing, totalDa
           <div>
             <span className="text-slate-400 block">Materials Subtotal (Chargeable)</span>
             <span className="font-bold text-slate-200">
-              £{pricing.materialsCost.low} – £{pricing.materialsCost.high}
+              £{materialsLow} – £{materialsHigh}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Interactive Controls: Day rate slider & VAT */}
+      {/* Interactive Controls: Day rate slider & Team configuration & VAT */}
       <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-1.5 text-xs font-semibold text-slate-700">
             <Sliders className="w-3.5 h-3.5 text-amber-600" />
-            <span>Adjust Your Day Rate:</span>
+            <span>
+              {teamSize === 1 ? "Adjust Decorator Day Rate:" : `Adjust Lead Rate (£${team[0]?.dayRate}/d):`}
+            </span>
           </div>
           <span className="text-xs font-extrabold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
-            £{adjustedDayRate}/day
+            {teamSize === 1 ? `£${adjustedDayRate}/day` : `£${combinedTeamRate}/day combined`}
           </span>
         </div>
 
@@ -92,15 +125,52 @@ export const PriceRangeCard: React.FC<PriceRangeCardProps> = ({ pricing, totalDa
           max="450"
           step="10"
           value={adjustedDayRate}
-          onChange={(e) => setAdjustedDayRate(Number(e.target.value))}
+          onChange={(e) => onDayRateChange(Number(e.target.value))}
           className="w-full accent-amber-500 cursor-pointer"
         />
 
+        {/* Multi-decorator team quick trigger */}
+        {onTeamChange && (
+          <div className="pt-2 border-t border-slate-200/60">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-1.5 text-xs text-slate-600 font-medium">
+                <Users className="w-3.5 h-3.5 text-amber-600" />
+                <span>
+                  Team on Job: <strong className="text-slate-900">{teamSize} {teamSize === 1 ? "Decorator" : "Decorators"}</strong>
+                </span>
+              </div>
+              <button
+                type="button"
+                id="toggle-price-card-team-btn"
+                onClick={() => setShowTeamDetails(!showTeamDetails)}
+                className="text-xs font-semibold text-amber-700 hover:text-amber-800 flex items-center space-x-1 underline"
+              >
+                <span>{showTeamDetails ? "Hide Team Setup" : "Modify Team & Rates"}</span>
+                {showTeamDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+
+            {showTeamDetails && (
+              <div className="mt-2.5">
+                <TeamSetupSection
+                  team={team}
+                  onTeamChange={onTeamChange}
+                  sameRateForEveryone={sameRateForEveryone}
+                  onSameRateToggle={onSameRateToggle}
+                  compact
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* VAT toggle */}
         <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs">
           <span className="text-slate-600">VAT Registration:</span>
           <button
             type="button"
-            onClick={() => setIncludeVat(!includeVat)}
+            id="price-range-vat-toggle"
+            onClick={onToggleVat}
             className={`px-2.5 py-1 rounded-md font-semibold transition ${
               includeVat
                 ? "bg-amber-500 text-slate-950 shadow-xs"
